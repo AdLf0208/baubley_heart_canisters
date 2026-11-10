@@ -1,0 +1,12 @@
+# Port-owned content mod for the Baubley Heart Canisters items and their
+# miniature hearts (definitions, models, textures, lang, the empty-canister
+# recipe and the creative tab). The hearts' eat/use behaviour lives in the
+# native bundle in ../. Assets come from the MIT upstream repository
+# (Traverse-Joe/Baubley-Heart-Canisters 1.21.1-1.4.3). LOCAL-ONLY until the
+# maintainer approves publishing (ARCHITECTURE.md §8).
+id = "bhc"
+name = "Baubley Heart Canisters"
+version = "1.21.1-1.4.3"
+api = "0.2"
+side = "both"
+capabilities = ["registries"]

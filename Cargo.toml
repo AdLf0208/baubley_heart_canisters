@@ -1,0 +1,19 @@
+[package]
+name = "horizon-bhc"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+description = "Baubley Heart Canisters for Horizon: carried heart canisters raise max health"
+
+# Ported from: Baubley Heart Canisters 1.21.1-1.4.3
+# (Traverse-Joe/Baubley-Heart-Canisters, MIT), Minecraft Java 1.21.1 NeoForge.
+# Local-only until the maintainer approves publication (ARCHITECTURE.md §8).
+
+[lib]
+# This exact source is also injected as a same-crate module by horizon-mixins.
+path = "mixins/bhc/runtime.rs"
+
+[workspace]
+members = ["tools/audit"]
+resolver = "2"

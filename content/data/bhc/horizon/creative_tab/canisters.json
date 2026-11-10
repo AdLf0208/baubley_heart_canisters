@@ -1,0 +1,16 @@
+{
+  "title": "itemGroup.bhcTab",
+  "icon": "bhc:red_heart_canister",
+  "items": [
+    "bhc:canister",
+    "bhc:red_heart",
+    "bhc:yellow_heart",
+    "bhc:green_heart",
+    "bhc:blue_heart",
+    "bhc:red_heart_canister",
+    "bhc:yellow_heart_canister",
+    "bhc:green_heart_canister",
+    "bhc:blue_heart_canister",
+    "bhc:soul_heart_canister"
+  ]
+}

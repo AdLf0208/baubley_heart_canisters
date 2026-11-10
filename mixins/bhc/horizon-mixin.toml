@@ -1,0 +1,142 @@
+[mod]
+id = "bhc"
+version = "0.1.0"
+priority = 100
+
+[compatibility]
+horizon_revision = "1d63e0a5a37a7a708eb0b32b49bf0dfeb28ed8a9"
+
+# The pure health core (standalone crate lib, injected as `crate::game::bhc`).
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "bhc"
+source = "runtime.rs"
+
+# Game-side glue: config, inventory scan, max health, sync.
+[[module]]
+id = "state"
+file = "crates/horizon-client/src/game.rs"
+name = "bhc_state"
+source = "support.rs"
+
+# The content half is inside this bundle (`data/bhc-content.hmod`, the built
+# `content/bhc.hmod`): this writes it to `.horizon-cache/` and appends it to the
+# dev-mod list, so one `.hnmod` installs the canisters, the hearts and the code.
+# The registry keeps one file per project, so a split port could not be listed;
+# AE2 ships the same pattern.
+[[injection]]
+id = "embedded-content"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::mods::content_root"
+helper = "embedded_content.rs"
+bindings = [
+  { name = "root", ty = "&std::path::Path", value = "root" },
+  { name = "enabled", ty = "&std::collections::BTreeSet<String>", value = "enabled" },
+  { name = "dev", ty = "&[std::path::PathBuf]", value = "dev" },
+]
+
+# Before the server starts: load or create `config/bhc.conf`.
+[[injection]]
+id = "about-to-start"
+hook = "server_about_to_start"
+hook_version = 1
+kind = "HEAD"
+helper = "about.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# End of every living player's server tick: count carried canisters and keep
+# the max-health modifier in step.
+[[injection]]
+id = "player-tick"
+hook = "player_tick"
+hook_version = 1
+kind = "HEAD"
+helper = "player.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# A miniature heart is eaten over 30 ticks (`ItemHeart.java:37-53`): answer
+# the use time and the eat pose, and do the heal at Finish. These three hooks
+# replace the old instant `use_item` claim.
+[[injection]]
+id = "use-duration"
+hook = "use_duration"
+hook_version = 1
+kind = "HEAD"
+helper = "duration.rs"
+bindings = [
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "duration", ty = "&mut i32", value = "duration" },
+]
+
+[[injection]]
+id = "use-animation"
+hook = "use_animation"
+hook_version = 1
+kind = "HEAD"
+helper = "animation.rs"
+bindings = [
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "animation", ty = "&mut horizon_world::consumable::UseAnimation", value = "animation" },
+]
+
+[[injection]]
+id = "use-finish"
+hook = "living_entity_use_item_finish"
+hook_version = 1
+kind = "HEAD"
+helper = "finish.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "entity", ty = "Option<i32>", value = "entity" },
+  { name = "hand", ty = "crate::first_person::Hand", value = "hand" },
+  { name = "duration", ty = "i32", value = "duration" },
+  { name = "result", ty = "&mut Option<ItemStack>", value = "result" },
+]
+
+# A player respawned: the transient max-health modifier must be put on the new
+# body (the per-tick hook alone can miss the integrated server's respawn body).
+[[injection]]
+id = "respawned"
+hook = "player_respawned"
+hook_version = 1
+kind = "HEAD"
+helper = "respawned.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "player", ty = "u128", value = "player" },
+  { name = "name", ty = "&str", value = "name" },
+]
+
+# End of a running server tick: resend a guest's inventory after a heart use
+# decremented the acting hand (the hub's slot diff misses it).
+[[injection]]
+id = "server-tick"
+hook = "server_tick"
+hook_version = 1
+kind = "HEAD"
+helper = "server_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "phase", ty = "ServerTickPhase", value = "phase" },
+]
+
+# A mob's drops are rolled: add the configured miniature hearts from
+# upstream's drops.json defaults.
+[[injection]]
+id = "loot-drops"
+hook = "loot_drops"
+hook_version = 1
+kind = "HEAD"
+helper = "loot.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "context", ty = "&NativeLootDrops<'_>", value = "context" },
+  { name = "drops", ty = "&mut Vec<ItemStack>", value = "drops" },
+]
