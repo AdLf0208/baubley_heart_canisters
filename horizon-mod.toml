@@ -1,0 +1,25 @@
+id = "bhc"
+name = "Baubley Heart Canisters"
+version = "0.2.0"
+description = """A port of Baubley Heart Canisters for Horizon: heart canisters carried in the
+inventory raise the carrier's maximum health by two points each, capped per colour by
+heart_stack_size; the miniature hearts are eaten over 30 ticks, heal their tier's amount and are
+dropped by hostile mobs, bosses and the dragon; a canister recipe and a creative tab ship with
+them. Upstream's Curios heart amulet and its GUI are not ported yet, so the carried inventory
+stands in for the amulet's slots."""
+authors = ["Traverse-Joe", "AdLf0208"]
+# A native mod: Rust in src/, compiled by the launcher against the game build [native] pins,
+# beside data/ and assets/. The id is the resource namespace and the only identity: Cargo's
+# package name and version are not the mod's.
+api = "0.2"
+# "both" is the installation side, not the hook's: an integrated server belongs to the client
+# installation, so a LAN host or a single-player world needs both. A dedicated server is "server".
+side = "both"
+# The one shared value every manifest carries ("May add blocks, items, mob effects and entity
+# types"); this mod declares its ten items under data/bhc/horizon/item/.
+capabilities = ["registries"]
+
+[native]
+game = "26.3"
+horizon = "0b14f8acfd97fa2c750e42795249dcc981178ca4"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
