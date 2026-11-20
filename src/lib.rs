@@ -33,7 +33,7 @@ use mod_api::{
 pub mod runtime;
 
 use runtime::{
-    CONFIG_FILE, Carried, Config, HEALTH_MODIFIER_ID, MiniHeart, PlayerMode, format_config,
+    CONFIG_FILE, Carried, HEALTH_MODIFIER_ID, MiniHeart, PlayerMode, ServerConfig, format_config,
     heart_drops, heart_use_duration, next_health, parse_config, use_heart,
 };
 
@@ -51,11 +51,11 @@ type Shared = Arc<Mutex<State>>;
 #[derive(Default)]
 struct State {
     /// Upstream's defaults until the game hands the file back at `config_loading`.
-    config: Config,
+    config: ServerConfig,
 }
 
 impl State {
-    fn config(&self) -> Config {
+    fn config(&self) -> ServerConfig {
         self.config.clone()
     }
 }
@@ -66,7 +66,7 @@ struct Mod {
 }
 
 impl Mod {
-    fn config(&self) -> Config {
+    fn config(&self) -> ServerConfig {
         lock(&self.state).config()
     }
 
@@ -108,7 +108,7 @@ impl Hooks for Mod {
         let config = ModConfig::new(
             "bhc",
             ConfigKind::Server,
-            &format_config(&Config::default()),
+            &format_config(&ServerConfig::default()),
         )
         .file(CONFIG_FILE);
         event.configs.push(config);
@@ -261,7 +261,12 @@ fn carried_canisters(host: &dyn Host, player: PlayerRef) -> Option<Carried> {
 /// distance below the maximum, as `updatePlayerHealth` does (`HealthModifier.java:149-182`).
 /// Replacing by id every tick is idempotent, which is what makes a respawn or a dimension
 /// change re-apply it without any state of our own.
-fn apply_health(host: &mut dyn ServerHost, player: PlayerRef, carried: &Carried, config: &Config) {
+fn apply_health(
+    host: &mut dyn ServerHost,
+    player: PlayerRef,
+    carried: &Carried,
+    config: &ServerConfig,
+) {
     let Some(living) = host.living(player.entity()) else {
         return;
     };

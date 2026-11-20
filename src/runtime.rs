@@ -329,7 +329,7 @@ pub fn use_heart(
     health: f32,
     max_health: f32,
     mode: PlayerMode,
-    config: &Config,
+    config: &ServerConfig,
 ) -> Option<HeartUse> {
     if !config.heart_eating {
         return None;
@@ -345,7 +345,7 @@ pub fn use_heart(
 /// caller matched; it keeps the call site self-documenting and leaves room for
 /// per-tier use times upstream does not have today.
 #[must_use]
-pub fn heart_use_duration(_heart: MiniHeart, config: &Config) -> Option<i32> {
+pub fn heart_use_duration(_heart: MiniHeart, config: &ServerConfig) -> Option<i32> {
     config.heart_eating.then_some(HEART_USE_TICKS)
 }
 
@@ -363,7 +363,7 @@ pub struct HeartDrop {
 pub fn heart_drops(
     kind: &str,
     category: &str,
-    config: &Config,
+    config: &ServerConfig,
     mut next_percent: impl FnMut() -> u32,
 ) -> Vec<HeartDrop> {
     if !config.mob_drops || config.heart_drop_amount == 0 {
@@ -386,7 +386,7 @@ pub fn heart_drops(
 
 /// The server settings this slice understands. Defaults are upstream's.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Config {
+pub struct ServerConfig {
     /// The maximum stack size for heart canisters, and so the maximum number
     /// of canisters of one colour that count (`ConfigHandler.java:27-29`).
     pub heart_stack_size: u32,
@@ -404,7 +404,7 @@ pub struct Config {
     heals: [i32; 4],
 }
 
-impl Default for Config {
+impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             heart_stack_size: HEART_STACK_SIZE_DEFAULT,
@@ -427,7 +427,7 @@ impl Default for Config {
     }
 }
 
-impl Config {
+impl ServerConfig {
     /// The chance a matching mob drops `heart`.
     #[must_use]
     pub fn chance(&self, heart: MiniHeart) -> f64 {
@@ -460,8 +460,8 @@ impl Config {
 /// Parse `config/bhc.conf`: `key = value` lines, `#` comments. Unknown keys and
 /// badly typed values keep their defaults; numbers are clamped.
 #[must_use]
-pub fn parse_config(text: &str) -> Config {
-    let mut config = Config::default();
+pub fn parse_config(text: &str) -> ServerConfig {
+    let mut config = ServerConfig::default();
     for raw in text.lines() {
         let line = raw.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -513,7 +513,7 @@ pub fn parse_config(text: &str) -> Config {
 
 /// Write the config in the format `parse_config` reads.
 #[must_use]
-pub fn format_config(config: &Config) -> String {
+pub fn format_config(config: &ServerConfig) -> String {
     format!(
         "# Baubley Heart Canisters (Horizon) — server settings.\n\
          # Maximum canisters of one colour that count, and the canister stack size upstream used.\n\
@@ -592,7 +592,7 @@ impl Carried {
 
     /// All counted canisters, each colour capped by `config.heart_stack_size`.
     #[must_use]
-    pub fn capped_total(&self, config: &Config) -> u32 {
+    pub fn capped_total(&self, config: &ServerConfig) -> u32 {
         Tier::ALL
             .into_iter()
             .map(|tier| self.capped_count(tier, config.heart_stack_size))
@@ -601,7 +601,7 @@ impl Carried {
 
     /// The max-health bonus in health points (`HealthModifier.java:161`).
     #[must_use]
-    pub fn health_bonus(&self, config: &Config) -> i32 {
+    pub fn health_bonus(&self, config: &ServerConfig) -> i32 {
         let total = self.capped_total(config);
         i32::try_from(total)
             .unwrap_or(i32::MAX)
@@ -621,8 +621,8 @@ pub fn next_health(old_health: f32, old_max: f32, new_max: f32) -> f32 {
 mod tests {
     use super::*;
 
-    fn config() -> Config {
-        Config::default()
+    fn config() -> ServerConfig {
+        ServerConfig::default()
     }
 
     #[test]
@@ -660,7 +660,7 @@ mod tests {
 
     #[test]
     fn config_round_trips_through_the_written_defaults() {
-        let c = Config::default();
+        let c = ServerConfig::default();
         assert_eq!(parse_config(&format_config(&c)), c);
         let c = parse_config("heart_stack_size = 3\n");
         assert_eq!(parse_config(&format_config(&c)), c);
@@ -874,7 +874,7 @@ mod tests {
         assert!(!roll(f64::NAN, 0));
     }
 
-    fn all_mobs_config(amount: u32) -> Config {
+    fn all_mobs_config(amount: u32) -> ServerConfig {
         parse_config(&format!(
             "mob_drops = true\n\
              heart_drop_amount = {amount}\n\
