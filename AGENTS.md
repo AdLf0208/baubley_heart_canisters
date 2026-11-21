@@ -25,13 +25,15 @@ ports/tools/build-slot.sh run --job sdk-bhc --port ports/bhc --step check \
 - `cargo horizon-mod` fetches the pinned SDK into `.horizon/sdk/` (gitignored, never packed).
   `build` packs the `.hmod`; it does **not** compile against the game — that is
   `horizon-launcher native-build . --instance <instance> --trust-native-code`.
-- **`src/runtime.rs` is byte-identical to the retired bundle's `runtime.rs`** (SHA-256
-  `0757718f…1b62`), apart from the 2026-11-20 rename of its local `Config` to `ServerConfig`
-  (current SHA-256 `f7cc16dd…4218`) so `uses.json` stops recording it as the SDK `type:Config`;
-  the behaviour rules live there, `src/lib.rs` only converts SDK types to theirs. New rule → a
-  test in `runtime.rs`; new glue → a private fn and a test in `lib.rs`.
+- `src/runtime.rs` carries the retired bundle's `runtime.rs` rules unchanged — same fields,
+  defaults, values and 41 tests. It differs from that file in its local `Config`'s 2026-11-20
+  rename to `ServerConfig` (so `uses.json` stops recording it as the SDK `type:Config`), and in
+  two comments added on 2026-11-21 (the `mob_drops` field doc and the conf's rule hint); current
+  SHA-256 `a854a786…`, earlier `f7cc16dd…`. The behaviour rules live there, `src/lib.rs` only
+  converts SDK types to theirs. New rule → a test in `runtime.rs`; new glue → a private fn and a
+  test in `lib.rs`.
 - Only the API the SDK publishes: `cargo horizon-mod hooks <text>` (or
-  `../_shared/sdk/0b14f8a/surface.json`) finds the exact method; never guess a name, and record an
+  `../_shared/sdk/0a875da/surface.json`) finds the exact method; never guess a name, and record an
   API gap in `notes.md` instead of faking one. `use_duration`/`use_animation` are `ItemPart`
   methods, not global hooks.
 - The delivered package is `bhc.hmod` **in the port root**, never in `target/`; `LICENSE` and

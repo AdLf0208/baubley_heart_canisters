@@ -1,9 +1,9 @@
-# Baubley Heart Canisters — Horizon port (SDK format, 0.2.1)
+# Baubley Heart Canisters — Horizon port (SDK format, 0.2.2)
 
 A clean-room Rust rewrite of
 [Baubley Heart Canisters 1.21.1-1.4.3](https://github.com/Traverse-Joe/Baubley-Heart-Canisters)
 (MIT) for Horizon, targeted at Minecraft 26.3. It is one flat SDK package (mod API `0.2`) at the
-SDK build `0b14f8acfd97fa2c750e42795249dcc981178ca4` / horizon-mixins
+SDK build `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` / horizon-mixins
 `e59da9094f0c2fdda6c627fe9eff22dec6a906f0`.
 
 Carried heart canisters raise the carrier's max health: **2 health points per canister**, with
@@ -13,7 +13,9 @@ player tick so respawns and dimension changes keep it. `config/bhc.conf` holds t
 
 The miniature hearts drop from mobs through `loot_drops` with upstream's default
 entities/chances (red from hostile mobs at 15 %, yellow from bosses, green from the dragon, blue
-from the warden), configurable per-colour chance, amount and an on/off switch; and they are
+from the warden), configurable per-colour chance, amount and an on/off switch; the world's
+`/gamerule mob_drops` is honoured too, because the engine still dispatches the hook after it has
+cleared the loot table; and they are
 **eaten over 30 ticks** by one `ItemPart` on the four hearts, healing the tier's upstream amount
 (red 20, yellow 40, green 60, blue 80 health points, clamped to max health), consuming one
 unless the player is creative, and never granting permanent max health. `heart_eating` and the
@@ -36,8 +38,8 @@ horizon-mod.toml       the manifest and the only identity (id, version, api 0.2,
 Cargo.toml             one crate; horizon-mod-api from .horizon/sdk/ and nothing else
 src/lib.rs             the one impl mod_api::Hooks: config, per-player tick, heart finish, loot,
                        register; plus the MiniHeartPart ItemPart
-src/runtime.rs         the pure health/drop/heart/config core + its 41 tests (byte-identical to
-                       the retired mixins/bhc/runtime.rs)
+src/runtime.rs         the pure health/drop/heart/config core + its 41 tests (the retired
+                       bundle's rules; the type was renamed and two comments added, see notes.md)
 assets/bhc/            item definitions, models, textures, lang
 data/bhc/              item templates, creative tab, canister recipe
 data/c/tags/           the two common tags the recipe names

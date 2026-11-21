@@ -21,6 +21,9 @@
 #      configured group) drops none, and a warden — upstream's overlap, a
 #      monster *and* a boss with its own blue entry — drops red + yellow + blue
 #      (loot/drop family, the differential);
+#   2b. the world's `mob_drops` rule is honoured: with it off the same zombie
+#      death adds no heart, with it on it adds the configured hearts again (the
+#      engine clears the loot table but still dispatches `loot_drops`);
 #   3. the carried `canister` recipe crafts exactly one `bhc:canister` from
 #      4 iron + 1 bone, consumes them, and the crafted *empty* canister adds no
 #      health (it is upstream's ingredient, not a heart canister); a heart in
@@ -123,6 +126,25 @@ hearts() {
 clear_items() {
     ctl command "kill @e[type=minecraft:item]" >/dev/null 2>&1 || true
     ctl wait 2
+}
+# Set a boolean game rule. `gamerule` refuses to "set" a rule to the value it
+# already holds (`commands.gamerule.not_set`), so a scene sets the value it needs
+# and then reads it back instead of assuming the previous scene left it alone.
+set_rule() {
+    ctl command "gamerule $1 $2" >/dev/null || fail "cannot set gamerule $1 to $2"
+    ctl wait 2
+}
+# Read a boolean game rule back from the command's own reply ("Game rule
+# mob_drops is currently set to false"), so the assertion is on the parsed
+# value, never on the absence of an error.
+expect_rule() {
+    local reply got
+    reply=$(ctl command "gamerule $1" | jq -r '.chat | join(" ")') \
+        || fail "cannot query gamerule $1"
+    got=$(printf '%s\n' "$reply" | grep -oE '(true|false)$' || true)
+    [ "$got" = "$2" ] \
+        || fail "gamerule $1 read back '${got:-nothing}' from [$reply], expected $2"
+    echo "gamerule $1 = $got"
 }
 # `ctl effects` reports the local player's live health (`allthetweaks` e2e).
 health() { ctl effects | jq -r '.health'; }
@@ -295,6 +317,42 @@ item_and_drop_leg() {
     # `notes.md` records the gap with the symbol.
 }
 
+# The world's `mob_drops` game rule (`/gamerule mob_drops`, on by default). The
+# engine applies the rule by clearing a mob's loot table, but it still dispatches
+# `loot_drops` and spawns whatever the hook adds — so a mod with a drop table of
+# its own has to read the rule. Both halves run in one session: with the rule off
+# the dying zombie must yield nothing, and with it on the same kill must yield the
+# configured hearts again (so the off half cannot pass by the drops being broken).
+game_rule_leg() {
+    say "the mob_drops rule: off gives no heart, on gives the heart"
+    set_rule mob_drops false
+    expect_rule mob_drops false
+    clear_items
+    ctl command "summon minecraft:zombie 2 64 2" >/dev/null || fail "cannot summon the zombie"
+    ctl wait 3
+    ctl command "kill @e[type=minecraft:zombie]" >/dev/null || fail "cannot kill the zombie"
+    ctl wait 3
+    off_red=$(ground_item bhc:red_heart)
+    off_all=$(hearts)
+    echo "gamerule mob_drops=false: the zombie dropped $off_red red and $off_all miniature hearts (expected 0)"
+    [ "$off_red" -eq 0 ] \
+        || fail "mob_drops=false but the zombie dropped $off_red bhc:red_heart, so the rule was not honoured"
+    [ "$off_all" -eq 0 ] || fail "mob_drops=false but $off_all miniature hearts dropped"
+
+    set_rule mob_drops true
+    expect_rule mob_drops true
+    clear_items
+    ctl command "summon minecraft:zombie 2 64 2" >/dev/null || fail "cannot summon the zombie"
+    ctl wait 3
+    ctl command "kill @e[type=minecraft:zombie]" >/dev/null || fail "cannot kill the zombie"
+    ctl wait 3
+    on_red=$(ground_item bhc:red_heart)
+    echo "gamerule mob_drops=true: the same kill dropped $on_red red hearts (expected 2)"
+    [ "$on_red" -eq 2 ] \
+        || fail "mob_drops=true but the zombie dropped $on_red red hearts, expected the configured 2"
+    clear_items
+}
+
 # The control: the same Nightly without the package. The identical item and drop
 # assertions must fail here, so this leg ends non-zero by design.
 control_leg() {
@@ -349,6 +407,7 @@ if [ "$SELFTEST" = 1 ]; then
     echo "SELFTEST: the drop assertion is alive; the run must end non-zero"
     exit 1
 fi
+game_rule_leg
 
 say "the carried recipe: 4 iron + 1 bone crafts one canister"
 ctl command "execute in minecraft:the_end run setblock 3 64 3 minecraft:crafting_table" >/dev/null
@@ -485,4 +544,4 @@ expect_current_health 40 "full health heals nothing"
     || fail "a full-health survival use did not consume the last heart"
 echo "full-health: the last red heart was consumed at 40/40"
 
-echo "PASS: all ten item ids are giveable and an unknown one is refused, a zombie dropped 2 configured red hearts, a cow dropped none and a warden dropped 2 red + 2 yellow + 2 blue, the carried recipe crafted one canister from 4 iron + 1 bone and consumed them while the empty canister added no health, 1 red 22, 2 red 24, +blue 26, -blue 24, 12 red capped at 40, clear 20, 24 survived respawn + relaunch, a red heart healed exactly 20 (16 -> 36) and was consumed, a stick healed nothing, creative kept its heart, and a full-health survival use still consumed one; max health never rose from eating"
+echo "PASS: all ten item ids are giveable and an unknown one is refused, a zombie dropped 2 configured red hearts, a cow dropped none and a warden dropped 2 red + 2 yellow + 2 blue, with gamerule mob_drops=false the same zombie death added no heart and with it true it added 2 again, the carried recipe crafted one canister from 4 iron + 1 bone and consumed them while the empty canister added no health, 1 red 22, 2 red 24, +blue 26, -blue 24, 12 red capped at 40, clear 20, 24 survived respawn + relaunch, a red heart healed exactly 20 (16 -> 36) and was consumed, a stick healed nothing, creative kept its heart, and a full-health survival use still consumed one; max health never rose from eating"

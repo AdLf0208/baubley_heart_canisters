@@ -4,13 +4,14 @@
 > mod-API merge (#16941, launcher ≥ 0.2.70); the bundle this file described below (PR #792,
 > closed by the 2026-11-18 format purge) was migrated to `horizon-mod.toml` + `Cargo.toml` +
 > `src/lib.rs` (`impl mod_api::Hooks`) + `src/runtime.rs` + `assets/`/`data/` at the SDK build
-> **`0b14f8acfd97fa2c750e42795249dcc981178ca4`** / horizon-mixins
-> **`e59da9094f0c2fdda6c627fe9eff22dec6a906f0`**, mod API `0.2`, port version **0.2.0**. Read
-> **`## Migration to the SDK format (2026-11-18, SDK 0b14f8a)`** at the end of this file first:
-> it is the current state. Everything above it is the history of the retired bundle (old pins,
-> `mixins/`, `horizon-mixin.toml`, the staging ladder) and is kept as the record, not as
-> instructions — `compatibility.json`, `mixins/<id>/`, `tools/horizon.py` and the `.hnmod` no
-> longer exist.
+> **`0a875da91dbb0fdcb7ba8c42c11341aa229af51a`** / horizon-mixins
+> **`e59da9094f0c2fdda6c627fe9eff22dec6a906f0`** (the campaign pin since 2026-11-21; the
+> migration itself was made at `0b14f8a`), mod API `0.2`, port version **0.2.2**. Read
+> **`## Review round 3 (PR #1443, 2026-11-21)`** at the very end first — it is the current state —
+> then `## Migration to the SDK format (2026-11-18, SDK 0b14f8a)`. Everything above the migration
+> section is the history of the retired bundle (old pins, `mixins/`, `horizon-mixin.toml`, the
+> staging ladder) and is kept as the record, not as instructions — `compatibility.json`,
+> `mixins/<id>/`, `tools/horizon.py` and the `.hnmod` no longer exist.
 
 Ported from **Baubley Heart Canisters 1.21.1-1.4.3**
 (`Traverse-Joe/Baubley-Heart-Canisters`, **MIT**) for Minecraft Java 1.21.1
@@ -23,16 +24,16 @@ NeoForge. Upstream read at commit
 The licence is MIT, so derivatives are allowed; publication still needs the
 maintainer's approval.
 
-Status: **slice 2 verified in game at the SDK pin (`0.2.1`)** — the five canister
-items, the four edible miniature hearts and their mob drops, a pure 41-test core,
-a flat `.hmod` that the launcher compiles into `nightly-2026-11-18-0b14f8a`, and a
-fail-capable e2e that proves every family in a real game through `horizon-ctl`:
-all ten item ids giveable and an unknown one refused, the zombie/cow/warden drop
-differential, the carried `canister` recipe crafted with its ingredients consumed,
-the canister health table (22/24/26/24/40/20, respawn, relaunch) and the heart
+Status: **slice 2 + the `mob_drops`-rule repair verified in game at the campaign pin
+(`0.2.2`)** — the five canister items, the four edible miniature hearts and their mob drops, a
+pure 41-test core, a flat `.hmod` that the launcher compiles into `nightly-2026-11-20-0a875da`,
+and a fail-capable e2e that proves every family in a real game through `horizon-ctl`: all ten item
+ids giveable and an unknown one refused, the zombie/cow/warden drop differential, the world's
+`mob_drops` rule honoured both ways, the carried `canister` recipe crafted with its ingredients
+consumed, the canister health table (22/24/26/24/40/20, respawn, relaunch) and the heart
 heal/consume table (default `PASS` + `EXIT:0`, control `EXIT:1`, selftest `EXIT:1`).
-The green heart's dragon group is `blocked` on the engine (see
-`## Slice 2 in game at 0b14f8a`); the earlier slices' retired-format record is below.
+The green heart's dragon group is `blocked` on the engine (see `## Slice 2 in game at 0b14f8a`);
+the earlier slices' retired-format record is below.
 
 ## Behaviour (slice 3): edible miniature hearts
 
@@ -176,6 +177,7 @@ A missing file is written with the defaults:
 # Maximum canisters of one colour that count, and the canister stack size upstream used.
 heart_stack_size = 10
 # Miniature hearts mobs drop (upstream's drops.json defaults).
+# The world's /gamerule mob_drops must be on as well.
 mob_drops = true
 heart_drop_amount = 1
 red_heart_drop_chance = 0.15
@@ -193,7 +195,10 @@ blue_heart_heal = 80
 `heart_stack_size` is upstream's stack size and per-colour cap (clamped
 0–99). `mob_drops` enables/disables slice 2's drop table; upstream has no such
 switch (it is a port addition so a server can turn the table off, and the
-control run uses it). `heart_drop_amount` is clamped 0–64 (upstream always
+control run uses it). It is **one of two switches**: the world's
+`/gamerule mob_drops` (on by default) is applied by the engine and is read by
+the hook as well, because the engine still dispatches `loot_drops` when the rule
+is off (see `## Review round 3`). `heart_drop_amount` is clamped 0–64 (upstream always
 drops one). The four chances are clamped 0–1 and default to upstream's
 `drops.json` values (`BaubleyHeartCanisters.java:75-78`); a missing or invalid
 value keeps the default. `heart_eating` is a port switch; the four
@@ -1010,6 +1015,7 @@ EXIT:1
 | Canister health: 2/canister, per-colour cap, gap rule, re-apply | **tested** — 22/24/26/24/40/20, respawn, relaunch (canister leg) |
 | Empty `canister` recipe (`canister.json`) | **tested** — crafted in a table: 1 `bhc:canister`, 4 iron + 1 bone consumed, wrong pattern empty, the empty canister adds no health (`craft_check.py`) |
 | Miniature-heart drops: red `hostile`, yellow `boss`, blue `warden` | **tested** — zombie 2 red, cow 0, warden 2 red + 2 yellow + 2 blue (drop leg) |
+| The world's `/gamerule mob_drops` (engine switch, on by default) | **tested** — `false`: the same zombie death adds 0 hearts; `true` in the same session: 2 red again (`game_rule_leg`, 0.2.2) |
 | Miniature-heart drops: green `dragon` | **blocked(`loot_drops` is never dispatched for the ender dragon — `EnderDragon.tickDeath`, `crates/horizon-client/src/game/mobs/dragon/death.rs`)**; rule carried + unit-tested, `dragon-gap.log` |
 | Miniature-heart eating: 30-tick chew, `HeartType` heal, creative keep, consume | **tested** — creative keeps, 16→36 exactly +20, stick no-heal, full-health consume, max unchanged (heart leg) |
 | Miniature-heart recipes (melted-heart chain: `red_heart.json` = 8 `bhc:red_heart_melted` + `#c:hearts`) | **not ported** — the melted items/relic apple/wither bones are deferred (gap 5); a heart in a table crafts nothing, asserted |
@@ -1062,3 +1068,171 @@ as `Config as ModConfig`). The package still uses the SDK `Config` through `ModC
 only the type's name changed, not its fields, defaults, values or tests.
 
 Skills: superpowers/using-superpowers,systematic-debugging,test-driven-development,verification-before-completion; BeautifulRust/rust-best-practices
+
+## Review round 3 (PR #1443, 2026-11-21) — the world's `mob_drops` rule, and the pin move to `0a875da`
+
+Third review round on PR #1443. The reviewer (`levzzz5154`) wrote, verbatim:
+
+> The earlier record and `Config` problems are fixed. The new loot hook still adds hearts when
+> `mob_drops` is off: the engine clears the loot table, but still dispatches the hook and uses
+> its result. Honor the actual gamerule without reinstating a ban on all empty loot tables.
+
+That is one behavioural defect, and the port had it: 0.2.1's `loot_drops` refused non-deaths and
+honoured the mod's own `mob_drops` **config** key, but never read the world's rule.
+
+### Root cause (from the engine's source, then proved in game)
+
+The rule reaches the engine's own roll only. In the read-only checkout
+`ports/_shared/pins/horizon-1d63e0a` (the same dispatch shape):
+
+- `crates/horizon-client/src/mobs/drops.rs:554-560` — `death_loot_table(m, mob_drops)` returns
+  **`None`** when the rule is off, so `drops::die` rolls nothing and returns an empty drop list;
+- `crates/horizon-client/src/game/creatures.rs:1930-1947` — the death still builds a
+  `NativeLootDrops` context (`table: death_loot_table(...).filter(|t| loot.has_table(t))`, i.e.
+  empty when the rule is off), calls `self.native_loot_drops(&context, &mut stacks)` **anyway**,
+  and spawns every stack in the list afterwards. The hook's additions are part of that list.
+
+So "the loot table is empty" is not "the mod may add nothing": the port's table was added after
+the engine had cleared its own, and `/gamerule mob_drops false` had no effect on hearts. The red
+run below is that defect in a real game, not a reading of Java.
+
+### The fix
+
+`src/lib.rs` (glue only; `runtime.rs` keeps the pure rules):
+
+```rust
+const MOB_DROPS_RULE: &str = "minecraft:mob_drops";
+
+fn mob_loot_allowed(rule: Result<Option<GameRuleValue>, LevelReadError>) -> bool {
+    !matches!(rule, Ok(Some(GameRuleValue::Bool(false))))
+}
+```
+
+`loot_drops` now fetches the level once (it already needed it for the level random), reads
+`level.game_rule(&*host, MOB_DROPS_RULE)` after the config gate, and returns before classifying or
+rolling when the rule refuses. Semantics:
+
+- an explicit **`false`** refuses — this is the reviewer's defect;
+- `true`, an **unknown** rule, a non-boolean value and an **unreadable** level allow, because the
+  rule is on by default and a transient `Stale`/`Unavailable` read must not silently stop every
+  drop. The mod's own `mob_drops` config key remains the second switch (`heart_drops` still checks
+  it, so config-off is honoured before any RNG draw).
+
+**The empty-table ban the reviewer warned about is not back.** `DropCall` still tests the *death*
+(`drop_call(true, used, damage_source.is_some())`); `LootDrops::table` is not consulted anywhere
+in the port — the ender dragon's empty table is why it was removed in 0.2.1.
+
+`bhc.conf`'s written defaults now name the rule in the comment above `mob_drops`, and
+`ServerConfig::mob_drops`'s doc says the same. `src/runtime.rs` therefore changed by **two comment
+lines only** (SHA-256 `a854a78601f5…`, was `f7cc16dd…4218`): no rule, default, value or test
+changed, and its 41 tests are unchanged.
+
+New unit test (lib.rs, glue): `the_worlds_mob_drops_rule_refuses_the_table_only_when_it_is_off`
+— `false` refuses; `true`, `None`, `Int(0)`, `Stale` and `Unavailable` allow.
+
+### Red first, then green: both gamerules in one session
+
+The e2e has one new leg, `game_rule_leg` (`tools/e2e.sh`), run after the drop differential and
+before the health scenes (peaceful difficulty removes hostile mobs, so the drop scenes must come
+first). It sets the rule, asserts the read-back from the command's own reply
+(`Game rule mob_drops is currently set to false`), kills a zombie and asserts the ground items.
+
+**Red** — the 0.2.2 sources *without* the fix, built by the launcher into
+`nightly-2026-11-20-0a875da` (`evidence/bhc-e2e/e2e-0.2.2-red-mob-drops.log`):
+
+```
+== the mob_drops rule: off gives no heart, on gives the heart ==
+{"ok":true,"ticks":187}
+gamerule mob_drops = false
+{"ok":true,"ticks":191}
+{"ok":true,"ticks":195}
+{"ok":true,"ticks":199}
+gamerule mob_drops=false: the zombie dropped 2 red and 2 miniature hearts (expected 0)
+FAIL: mob_drops=false but the zombie dropped 2 bhc:red_heart, so the rule was not honoured
+EXIT:1
+```
+
+The unit test's own red came first, before the function existed:
+`error[E0425]: cannot find function mob_loot_allowed in this scope` (5 errors,
+`evidence/bhc-0.2.2/unit-red-missing-fn.log`).
+
+**Green** — the same leg after the fix, same pin (`evidence/bhc-e2e/e2e-0.2.2-default.log`):
+
+```
+== the mob_drops rule: off gives no heart, on gives the heart ==
+{"ok":true,"ticks":164}
+gamerule mob_drops = false
+{"ok":true,"ticks":168}
+{"ok":true,"ticks":172}
+{"ok":true,"ticks":176}
+gamerule mob_drops=false: the zombie dropped 0 red and 0 miniature hearts (expected 0)
+{"ok":true,"ticks":180}
+gamerule mob_drops = true
+{"ok":true,"ticks":184}
+{"ok":true,"ticks":188}
+{"ok":true,"ticks":192}
+gamerule mob_drops=true: the same kill dropped 2 red hearts (expected 2)
+{"ok":true,"ticks":195}
+```
+
+Both halves are needed: the `false` half is the reviewer's defect (red before the fix), and the
+`true` half makes the leg fail-capable in the other direction — a hook that stopped adding hearts
+would fail it, so the `false` half cannot pass by the drop table being broken.
+
+### Pin move and version
+
+The launcher at the campaign pin refuses a package whose `[native]` names another commit
+(`ports/tools/launcher-game.sh` `check_pins`), and the last e2e was made at `0b14f8a`. The package
+was therefore moved to the campaign pin before the red run:
+
+```
+$ cargo horizon-mod update --horizon 0a875da91dbb0fdcb7ba8c42c11341aa229af51a
+Baubley Heart Canisters, from 0b14f8a to 0a875da: none of the 209 items it uses changed.
+Pinned to Horizon 0a875da91dbb0fdcb7ba8c42c11341aa229af51a
+```
+
+`[native]` is now `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` / mixins
+`e59da9094f0c2fdda6c627fe9eff22dec6a906f0`; `horizon-mod.toml` and `Cargo.toml` say **`0.2.2`**
+(0.2.1 is the version on PR #1443, so this is a new version rather than an edit of it).
+
+### Verification (0.2.2 at `0a875da`)
+
+| Command | Evidence | Result |
+|---|---|---|
+| `cargo test --offline` | `evidence/bhc/sdk-0a875da/sdk-test.log` | **45 passed**, 0 failed — 41 runtime + 4 glue (`drop_call`, the new rule test, modifier id, category) |
+| `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy.log` | exit 0, **0 warnings** |
+| `cargo fmt --check` | `sdk-fmt.log` | exit 0 |
+| `cargo horizon-mod build` ×2 | `evidence/bhc-0.2.2/build-final-{1,2}.log` | exit 0, **`cmp`-identical** |
+| package | `sha256sum; stat -c%s` | **39,108 B**, SHA-256 `dc2e679ffa5ce5474caf14a9087806c46599859662dc5fcee4469f86462bf5ad`, 53 entries, no packed `Cargo.lock` |
+| `cargo horizon-mod check bhc.hmod` | `sdk-check.log` | `bhc 0.2.2 (native-mod, format native-1/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/e59da9094f0c2fdda6c627fe9eff22dec6a906f0, for 26.3)`, exit 0 |
+| `cargo horizon-mod fits bhc.hmod --build 0a875da` | `sdk-fits.log` | `0a875da  made for`, exit 0 |
+| `cargo horizon-mod fits bhc.hmod --build 0b14f8a` | `sdk-fits.log` | `0b14f8a  fits`, exit 0 |
+| `cargo horizon-mod fits bhc.hmod --build f00125f` | `sdk-fits.log` | `f00125f  fits`, exit 0 |
+| `python3 ports/tools/verify-sdk-package.py bhc` | — | **1/1 package(s) verified**, exit 0 (45 tests read from the log) |
+| `ports/tools/launcher-game.sh build bhc` | `evidence/bhc-0.2.2/launcher-build-{red,final}.log` | `native-0a875da-…` built and exported, `EXIT:0` |
+| `tools/e2e.sh` (default) | `evidence/bhc-e2e/e2e-0.2.2-default.log` | **`PASS` + `EXIT:0`** |
+| `MODE=control tools/e2e.sh` (the same Nightly, no package) | `e2e-0.2.2-control.log` | **`FAIL` + `EXIT:1`** |
+| `SELFTEST=1 tools/e2e.sh` | `e2e-0.2.2-selftest.log` | **`FAIL` + `EXIT:1`** |
+| the pre-fix run (red) | `e2e-0.2.2-red-mob-drops.log` | **`FAIL` + `EXIT:1`** |
+| `python3 ports/tools/check-e2e-logs.py bhc-e2e --strict` | — | `logs=7 ok=7 missing-exit=0 bad-exit=0`, exit 0 |
+| `python3 ports/tools/check-skills.py --notes ports/bhc` | — | `SKILLS GATE: PASS` |
+
+All cargo/launcher/e2e steps ran through `ports/tools/build-slot.sh` with `CARGO_INCREMENTAL=0` and
+no `--target-dir`; the e2e used the launcher's `/home` scratch `E2E_TMP`, never `/tmp`.
+
+**Trap paid for once:** the package was first rebuilt without `rm -f Cargo.lock`, and
+`cargo horizon-mod build` then packed the freshly generated `Cargo.lock` (41,438 B, 54 entries) —
+the builder does not exclude it by itself. The delivered build removes `Cargo.lock` first, as this
+port's `AGENTS.md` says, which is why the package is 53 entries and `verify-sdk-package.py`'s
+"no packed Cargo.lock" check passes. The e2e legs above ran on the final 39,108 B package, not on
+the 41,438 B one, and the `README.md`/`notes.md` edits were in the tree before that build.
+
+**The PR's remaining red is the stager.** The current CI failure on #1443 is
+`staging holds 900 files and automatic staging stops at 900` — a maintainer-side staging ceiling
+(see `ports/_shared/HANDOVER.md` §9d), not a package defect. `cargo horizon-mod check` is green
+here and the package is complete; the registry's `fetch.sh` step stays red until the digest is in
+`staging` (`fetch.sh` reads only the upstream repo, never the author's release), which is the
+maintainer's staging step and cannot be done from the port.
+
+Skills: superpowers/using-superpowers,writing-plans,systematic-debugging,test-driven-development,verification-before-completion; BeautifulRust/rust-best-practices,rust-port
+

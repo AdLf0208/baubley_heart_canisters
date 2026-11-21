@@ -23,11 +23,11 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use mod_api::{
     self, AttributeModifier, AttributeOperation, ClientHost, Config as ModConfig, ConfigFile,
-    ConfigKind, ConfigLoadingEvent, ConfigReloadingEvent, GameMode, Hooks, Host, HostSide,
-    Identifier, ItemKey, ItemPart, ItemStack, LivingEntityUseItemFinishEvent, LootDropsEvent,
-    MobCategory, ModifierLifetime, PlayerRef, PlayerTickPostEvent, RandomSource,
-    RegisterConfigsEvent, Registrar, RegistrationContext, ServerHost, UseAnimation,
-    UseAnimationEvent, UseDurationEvent,
+    ConfigKind, ConfigLoadingEvent, ConfigReloadingEvent, GameMode, GameRuleValue, Hooks, Host,
+    HostSide, Identifier, ItemKey, ItemPart, ItemStack, LevelReadError,
+    LivingEntityUseItemFinishEvent, LootDropsEvent, MobCategory, ModifierLifetime, PlayerRef,
+    PlayerTickPostEvent, RandomSource, RegisterConfigsEvent, Registrar, RegistrationContext,
+    ServerHost, UseAnimation, UseAnimationEvent, UseDurationEvent,
 };
 
 pub mod runtime;
@@ -184,6 +184,10 @@ impl Hooks for Mod {
     /// `drops.json` defaults (`DropHandler.java:32-119`). Only a mob death's loot is touched: a
     /// block break names no mob, a player's use sets `used`, and a leashed mob's lead drop names
     /// the mob without a death's damage source.
+    ///
+    /// The world's `mob_drops` rule is read here, not trusted to the engine: the engine clears
+    /// the mob's loot table when the rule is off but still dispatches this hook and spawns what
+    /// it returns, so a drop table of the port's own would ignore `/gamerule mob_drops false`.
     fn loot_drops(&self, host: &mut dyn ServerHost, event: &mut LootDropsEvent<'_>) {
         let context = event.context;
         let Some((entity, kind)) = context.entity else {
@@ -196,13 +200,16 @@ impl Hooks for Mod {
         if !config.mob_drops || config.heart_drop_amount == 0 {
             return;
         }
+        let Some(level) = host.level(context.dimension) else {
+            return;
+        };
+        if !mob_loot_allowed(level.game_rule(&*host, MOB_DROPS_RULE)) {
+            return;
+        }
         let category = host
             .entity(entity)
             .and_then(|dead| dead.classification(&*host))
             .map_or("", category_name);
-        let Some(level) = host.level(context.dimension) else {
-            return;
-        };
         let drawn = level.with_random(&mut *host, |random| {
             heart_drops(kind, category, &config, || {
                 u32::try_from(random.next_int_bound(100).unwrap_or(0)).unwrap_or(0)
@@ -320,6 +327,21 @@ fn category_name(category: MobCategory) -> &'static str {
     }
 }
 
+/// The world's `mob_drops` game rule (`/gamerule mob_drops`, on by default), by name because a
+/// vanilla rule has no registered key a mod can hold.
+const MOB_DROPS_RULE: &str = "minecraft:mob_drops";
+
+/// Whether the world's `mob_drops` rule lets a death yield loot. The engine applies the rule by
+/// clearing the mob's loot table, but it still dispatches `loot_drops` and spawns whatever the
+/// hook adds, so a drop table of the port's own has to read the rule itself.
+///
+/// Only an explicit `false` refuses. `true` obviously allows; an unknown rule, a non-boolean
+/// value and an unreadable level also allow, because the rule is on by default and the mod's own
+/// `mob_drops` setting is what the player has explicitly configured.
+fn mob_loot_allowed(rule: Result<Option<GameRuleValue>, LevelReadError>) -> bool {
+    !matches!(rule, Ok(Some(GameRuleValue::Bool(false))))
+}
+
 /// Which `loot_drops` call this is. Upstream's table answers a mob's death and nothing else:
 /// a player's use (shears, a brush) sets `used`; a block break names no mob; and a leashed mob's
 /// lead drop names the mob without a death's damage source (`LootDrops::damage_source` is
@@ -381,5 +403,21 @@ mod tests {
         assert_eq!(drop_call(true, true, true), DropCall::NotADeath);
         // A block break names no mob.
         assert_eq!(drop_call(false, false, true), DropCall::NotADeath);
+    }
+
+    #[test]
+    fn the_worlds_mob_drops_rule_refuses_the_table_only_when_it_is_off() {
+        // `/gamerule mob_drops false` clears the mob's loot table, but the engine still
+        // dispatches `loot_drops` and spawns whatever the hook adds, so the hook has to read
+        // the rule: an explicit `false` is the one answer that refuses.
+        assert!(!mob_loot_allowed(Ok(Some(GameRuleValue::Bool(false)))));
+        assert!(mob_loot_allowed(Ok(Some(GameRuleValue::Bool(true)))));
+        // Anything else keeps the mod's own `mob_drops` setting as the switch: the rule is on
+        // by default, and a transient read failure must not stop every drop.
+        assert!(mob_loot_allowed(Ok(None)));
+        assert!(mob_loot_allowed(Ok(Some(GameRuleValue::Int(0)))));
+        for error in [LevelReadError::Stale, LevelReadError::Unavailable] {
+            assert!(mob_loot_allowed(Err(error)), "{error:?}");
+        }
     }
 }

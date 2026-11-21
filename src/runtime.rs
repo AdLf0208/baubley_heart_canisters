@@ -391,7 +391,10 @@ pub struct ServerConfig {
     /// of canisters of one colour that count (`ConfigHandler.java:27-29`).
     pub heart_stack_size: u32,
     /// Whether mobs drop miniature hearts. Upstream has no switch; this slice
-    /// adds one so a server can turn the drop table off.
+    /// adds one so a server can turn the drop table off. The world's
+    /// `/gamerule mob_drops` is a second switch the engine applies by clearing
+    /// the loot table; the glue reads it too, because the engine still calls the
+    /// drop hook when it is off.
     pub mob_drops: bool,
     /// How many of a heart one successful entry drops.
     pub heart_drop_amount: u32,
@@ -519,6 +522,7 @@ pub fn format_config(config: &ServerConfig) -> String {
          # Maximum canisters of one colour that count, and the canister stack size upstream used.\n\
          heart_stack_size = {}\n\
          # Miniature hearts mobs drop (upstream's drops.json defaults).\n\
+         # The world's /gamerule mob_drops must be on as well.\n\
          mob_drops = {}\n\
          heart_drop_amount = {}\n\
          red_heart_drop_chance = {}\n\
