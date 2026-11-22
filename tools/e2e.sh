@@ -27,8 +27,14 @@
 #   3. the carried `canister` recipe crafts exactly one `bhc:canister` from
 #      4 iron + 1 bone, consumes them, and the crafted *empty* canister adds no
 #      health (it is upstream's ingredient, not a heart canister); a heart in
-#      the grid crafts nothing because its own recipe needs the deferred
-#      melted-heart chain (recipe family, `tools/craft_check.py`);
+#      the grid crafts nothing because the heart recipe needs melted hearts
+#      (recipe family, `tools/craft_check.py`);
+#   3b. the melted-heart chain: a furnace smelts one red heart into one
+#      `bhc:red_heart_melted` at 100 ticks and not before (the recipe's
+#      `cookingtime`, and a stick in the same furnace never produces), the
+#      other three tiers at their own 200/300/400 ticks, the four heart recipes
+#      (8 melted + any `#c:hearts` heart) and the six tier conversions craft
+#      (slice 4, `tools/craft_check.py` and this file's furnace leg);
 #   4. the canister health table: 1 red 22, 2 red 24, +blue 26, -blue 24,
 #      12 red capped at 40, clear 20, and 24 survives a death (keepInventory)
 #      and a full relaunch (slice 1);
@@ -149,6 +155,50 @@ expect_rule() {
 # `ctl effects` reports the local player's live health (`allthetweaks` e2e).
 health() { ctl effects | jq -r '.health'; }
 item_count() { ctl inventory | jq -r --arg i "$1" '.counts[$i] // 0'; }
+# How many of ITEM one slot group of the container at X Y Z holds.
+container_item() {
+    ctl container "$1" "$2" "$3" \
+        | jq -r --arg i "$4" '[.slots[] | select(.item == $i) | .count] | add // 0'
+}
+# A fresh furnace at X Y Z (its block entity, so its slots, starts empty).
+furnace_at() {
+    ctl command "execute in minecraft:the_end run setblock $1 $2 $3 minecraft:air" >/dev/null
+    ctl command "execute in minecraft:the_end run setblock $1 $2 $3 minecraft:furnace" >/dev/null
+    ctl wait 3
+}
+# Put COUNT of ITEM in furnace slot SLOT (0 input, 1 fuel, 2 output).
+furnace_put() {
+    ctl command "execute in minecraft:the_end run item replace block $1 $2 $3 container.$4 with $5 $6" >/dev/null
+    ctl wait 2
+}
+# One carried smelting recipe: one HEART + one coal in a furnace makes one
+# OUTPUT, and the recipe's own cookingtime is asserted from both sides — the
+# input is still there shortly before TICKS, and the output exists shortly
+# after. A cookingtime of 200 (the vanilla default) or an instant result would
+# fail one of the two halves.
+expect_smelt() { # expect_smelt X Y Z HEART OUTPUT TICKS
+    local x=$1 y=$2 z=$3 heart=$4 out=$5 ticks=$6 early still late
+    furnace_at "$x" "$y" "$z"
+    furnace_put "$x" "$y" "$z" 0 "$heart" 1
+    furnace_put "$x" "$y" "$z" 1 minecraft:coal 1
+    still=$(container_item "$x" "$y" "$z" "$heart")
+    early=$(container_item "$x" "$y" "$z" "$out")
+    [ "$still" = 1 ] && [ "$early" = 0 ] \
+        || fail "the furnace was not primed with one $heart (input $still, output $early)"
+    ctl wait $((ticks - 40))
+    still=$(container_item "$x" "$y" "$z" "$heart")
+    early=$(container_item "$x" "$y" "$z" "$out")
+    echo "  $heart after ~$((ticks - 30)) of $ticks ticks: input $still, output $early"
+    [ "$still" = 1 ] && [ "$early" = 0 ] \
+        || fail "$heart finished before its $ticks-tick cookingtime (input $still, output $early)"
+    ctl wait 60
+    late=$(container_item "$x" "$y" "$z" "$out")
+    still=$(container_item "$x" "$y" "$z" "$heart")
+    echo "  $heart after ~$((ticks + 30)) of $ticks ticks: input $still, output $late"
+    [ "$late" = 1 ] || fail "the $heart smelting recipe made $late $out, not 1"
+    [ "$still" = 0 ] || fail "the smelted $heart was not consumed ($still left)"
+}
+
 # One instant-damage hit is 6 health. The 22-tick wait clears the 20-tick
 # invulnerability frame, and natural regeneration is off in every health scene.
 hit() { ctl command "effect give @s minecraft:instant_damage 1 0" >/dev/null; ctl wait 22; }
@@ -242,7 +292,7 @@ launch() { # launch WORLD [GAME]
 # and the zombie drops nothing, so the identical assertions fail.
 item_and_drop_leg() {
     say "every content item id is giveable, and an unknown id is refused"
-    ITEMS="bhc:canister bhc:red_heart bhc:yellow_heart bhc:green_heart bhc:blue_heart bhc:red_heart_canister bhc:yellow_heart_canister bhc:green_heart_canister bhc:blue_heart_canister bhc:soul_heart_canister"
+    ITEMS="bhc:canister bhc:red_heart bhc:yellow_heart bhc:green_heart bhc:blue_heart bhc:red_heart_melted bhc:yellow_heart_melted bhc:green_heart_melted bhc:blue_heart_melted bhc:red_heart_canister bhc:yellow_heart_canister bhc:green_heart_canister bhc:blue_heart_canister bhc:soul_heart_canister"
     for item in $ITEMS; do
         ctl give "$item" 1 >/dev/null || fail "the package did not provide $item"
     done
@@ -353,6 +403,32 @@ game_rule_leg() {
     clear_items
 }
 
+# The melted-heart chain's furnace half: each carried smelting recipe, at its
+# own cookingtime (the jar's 100/200/300/400 ticks, `data/bhc/recipe/
+# *_heart_melted_from_smelting.json`). One furnace is reused, replaced before
+# every case. A stick in the same furnace is the control: it has no smelting
+# recipe, so the output slot must stay empty — that is what makes the output
+# assertion read the recipe rather than the furnace's clock.
+smelt_leg() {
+    say "smelting: a red heart becomes a melted heart in 100 ticks, not before"
+    expect_smelt 2 64 3 bhc:red_heart bhc:red_heart_melted 100
+    expect_smelt 2 64 3 bhc:yellow_heart bhc:yellow_heart_melted 200
+    expect_smelt 2 64 3 bhc:green_heart bhc:green_heart_melted 300
+    expect_smelt 2 64 3 bhc:blue_heart bhc:blue_heart_melted 400
+
+    say "smelting: a stick has no smelting recipe and makes nothing"
+    furnace_at 2 64 3
+    furnace_put 2 64 3 0 minecraft:stick 1
+    furnace_put 2 64 3 1 minecraft:coal 1
+    ctl wait 140
+    stick_in=$(container_item 2 64 3 minecraft:stick)
+    stick_out=$(ctl container 2 64 3 \
+        | jq -r '[.slots[] | select(.slot == 2 and .item != null) | .item] | join(",")')
+    echo "  stick after 140 ticks: input $stick_in, output [$stick_out]"
+    [ "$stick_in" = 1 ] || fail "the control stick was consumed by the furnace"
+    [ -z "$stick_out" ] || fail "a stick smelted into $stick_out without a recipe"
+}
+
 # The control: the same Nightly without the package. The identical item and drop
 # assertions must fail here, so this leg ends non-zero by design.
 control_leg() {
@@ -408,6 +484,8 @@ if [ "$SELFTEST" = 1 ]; then
     exit 1
 fi
 game_rule_leg
+
+smelt_leg
 
 say "the carried recipe: 4 iron + 1 bone crafts one canister"
 ctl command "execute in minecraft:the_end run setblock 3 64 3 minecraft:crafting_table" >/dev/null
@@ -544,4 +622,4 @@ expect_current_health 40 "full health heals nothing"
     || fail "a full-health survival use did not consume the last heart"
 echo "full-health: the last red heart was consumed at 40/40"
 
-echo "PASS: all ten item ids are giveable and an unknown one is refused, a zombie dropped 2 configured red hearts, a cow dropped none and a warden dropped 2 red + 2 yellow + 2 blue, with gamerule mob_drops=false the same zombie death added no heart and with it true it added 2 again, the carried recipe crafted one canister from 4 iron + 1 bone and consumed them while the empty canister added no health, 1 red 22, 2 red 24, +blue 26, -blue 24, 12 red capped at 40, clear 20, 24 survived respawn + relaunch, a red heart healed exactly 20 (16 -> 36) and was consumed, a stick healed nothing, creative kept its heart, and a full-health survival use still consumed one; max health never rose from eating"
+echo "PASS: all fourteen item ids are giveable and an unknown one is refused, a zombie dropped 2 configured red hearts, a cow dropped none and a warden dropped 2 red + 2 yellow + 2 blue, with gamerule mob_drops=false the same zombie death added no heart and with it true it added 2 again, one red heart smelted into one bhc:red_heart_melted at 100 ticks (not before, input consumed) and the other three tiers at their own 200/300/400 ticks while a stick made nothing, the carried recipe crafted one canister from 4 iron + 1 bone and consumed them while the empty canister added no health, every heart recipe crafted one heart from eight of its melted hearts plus any c:hearts heart (seven crafted nothing) and all six tier recipes traded nine lower melted hearts for one higher and one higher for nine lower, 1 red 22, 2 red 24, +blue 26, -blue 24, 12 red capped at 40, clear 20, 24 survived respawn + relaunch, a red heart healed exactly 20 (16 -> 36) and was consumed, a stick healed nothing, creative kept its heart, and a full-health survival use still consumed one; max health never rose from eating"

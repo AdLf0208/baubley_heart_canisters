@@ -24,14 +24,16 @@ NeoForge. Upstream read at commit
 The licence is MIT, so derivatives are allowed; publication still needs the
 maintainer's approval.
 
-Status: **slice 2 + the `mob_drops`-rule repair verified in game at the campaign pin
-(`0.2.2`)** — the five canister items, the four edible miniature hearts and their mob drops, a
-pure 41-test core, a flat `.hmod` that the launcher compiles into `nightly-2026-11-20-0a875da`,
-and a fail-capable e2e that proves every family in a real game through `horizon-ctl`: all ten item
+Status: **slices 1–4 verified in game at the campaign pin (`0.2.3`)** — the five canister items,
+the four edible miniature hearts and their mob drops, the melted-heart chain (four melted items,
+four smelting recipes, six tier conversions, four heart recipes and the `c:hearts` tag), a pure
+41-test core, a flat `.hmod` that the launcher compiles into `nightly-2026-11-20-0a875da`, and a
+fail-capable e2e that proves every family in a real game through `horizon-ctl`: all fourteen item
 ids giveable and an unknown one refused, the zombie/cow/warden drop differential, the world's
-`mob_drops` rule honoured both ways, the carried `canister` recipe crafted with its ingredients
-consumed, the canister health table (22/24/26/24/40/20, respawn, relaunch) and the heart
-heal/consume table (default `PASS` + `EXIT:0`, control `EXIT:1`, selftest `EXIT:1`).
+`mob_drops` rule honoured both ways, each smelting recipe at its own cooking time, every carried
+table recipe crafted with its ingredients consumed (plus its negatives), the canister health table
+(22/24/26/24/40/20, respawn, relaunch) and the heart heal/consume table (default `PASS` + `EXIT:0`,
+control `EXIT:1`, selftest `EXIT:1`).
 The green heart's dragon group is `blocked` on the engine (see `## Slice 2 in game at 0b14f8a`);
 the earlier slices' retired-format record is below.
 
@@ -47,8 +49,8 @@ health sync (`ItemHeart.java:54-69`). It never touches
 `Attributes.MAX_HEALTH`: the mod's only permanent-heart behaviour is the
 canister/amulet formula (`HealthModifier.java:149-206`), which slice 1 already
 carries. The hearts are also canister ingredients and smelt into melted hearts
-(`BHCRecipeProvider.java:28-31,34-37,40`), but the melted-heart/relic-apple
-chain is deferred, so no miniature-heart recipe is carried.
+(`BHCRecipeProvider.java:28-31,34-37,40`); the melted-heart chain itself is slice 4
+(`## Slice 4 (0.2.3)`), and the relic apple it also needs stays deferred.
 
 The port models the whole decision in `runtime.rs`:
 
@@ -245,8 +247,8 @@ No ATM10 jar was carried; everything comes from the **MIT upstream repository**:
 The four miniature hearts stay plain stick-template items (no
 `food`/`consumable` component): the native `use_item` hook owns the heal, so
 the vanilla food path never runs and a full-hunger player can still use one.
-Upstream's heart recipes need the deferred `*_heart_melted` items
-(`BHCRecipeProvider.java:28-31,40`), so none is carried.
+Upstream's heart recipes are carried since 0.2.3 together with the four
+`*_heart_melted` items (`BHCRecipeProvider.java:28-31,40`; see `## Slice 4`).
 
 ## Deviations and gaps
 
@@ -267,9 +269,10 @@ Upstream's heart recipes need the deferred `*_heart_melted` items
    `max_stack_size`.
 5. **Deferred**: Curios slots, Heart Amulet/Soul Amulet and their GUI,
    heart patches, Heartpulse belts, Vitality Blade/Vigor Bow, the relic
-   apple/wither bone/melted-heart chain, the coloured canister recipes (their
-   ingredients are the deferred heart chain), and the starting-health base
-   tweak. The empty `canister` recipe is carried.
+   apple/wither bone items and the coloured canister recipes that need them,
+   and the starting-health base tweak. The empty `canister` recipe is carried.
+   (The melted-heart chain was deferred here through 0.2.2 and is ported in
+   0.2.3 — see `## Slice 4`.)
 6. **No persistence file.** The inventory is the source of truth; unlike
    solcarrot's history, nothing needs a world file. The modifier is transient
    and re-applied every tick.
@@ -778,8 +781,10 @@ lang, the creative tab, the empty-canister recipe, the two `c:` tag files, `src/
    `--dev-mod` control leg becomes "the same game without the mod", which is the honest
    differential at this format.
 6. Upstream gaps unchanged: the Curios heart amulet and its GUI, heart patches, belts, weapons,
-   mob drops beyond the four shipped defaults, the melted-heart recipe chain, the starting-health
-   tweak, and the inventory-scan stand-in for the amulet's slots (see `## Deviations and gaps`).
+   mob drops beyond the four shipped defaults, the relic apple/wither bone items and the coloured
+   canister recipes they gate, the starting-health tweak, and the inventory-scan stand-in for the
+   amulet's slots (see `## Deviations and gaps`). The melted-heart chain listed here through 0.2.2
+   is ported in 0.2.3 (`## Slice 4`).
 
 ### Changelog for the resubmission
 
@@ -1018,8 +1023,12 @@ EXIT:1
 | The world's `/gamerule mob_drops` (engine switch, on by default) | **tested** — `false`: the same zombie death adds 0 hearts; `true` in the same session: 2 red again (`game_rule_leg`, 0.2.2) |
 | Miniature-heart drops: green `dragon` | **blocked(`loot_drops` is never dispatched for the ender dragon — `EnderDragon.tickDeath`, `crates/horizon-client/src/game/mobs/dragon/death.rs`)**; rule carried + unit-tested, `dragon-gap.log` |
 | Miniature-heart eating: 30-tick chew, `HeartType` heal, creative keep, consume | **tested** — creative keeps, 16→36 exactly +20, stick no-heal, full-health consume, max unchanged (heart leg) |
-| Miniature-heart recipes (melted-heart chain: `red_heart.json` = 8 `bhc:red_heart_melted` + `#c:hearts`) | **not ported** — the melted items/relic apple/wither bones are deferred (gap 5); a heart in a table crafts nothing, asserted |
-| Coloured canister recipes (canister + heart + `bhc:relic_apple` + `#c:wither_bones`) | **not ported** — needs the deferred relic-apple/heart chain |
+| Miniature-heart recipes (melted-heart chain: `red_heart.json` = 8 `bhc:red_heart_melted` + `#c:hearts`) | **tested** (0.2.3) — all four heart recipes craft one heart from eight of their melted hearts plus a *different* colour's heart in the centre (the `c:hearts` tag), seven melted hearts craft nothing (`craft_check.py`) |
+| Four `bhc:*_heart_melted` items (stick template, item model, 16×16 texture, lang, creative tab) | **tested** (0.2.3) — every id giveable and read back (item leg, fourteen ids) |
+| Smelting a miniature heart into its melted heart (100/200/300/400 ticks) | **tested** (0.2.3) — `smelt_leg`: one output after the recipe's own cook time, none before it, the input consumed; a stick in the same lit furnace makes nothing |
+| Tier conversions (9 lower melted → 1 higher, 1 higher → 9 lower) | **tested** (0.2.3) — all six recipes, both directions, grid consumed (`craft_check.py`) |
+| `data/c/tags/item/hearts.json` | **tested** (0.2.3) — the heart recipes match a heart of another colour, which only the tag allows |
+| Coloured canister recipes (canister + heart + `bhc:relic_apple` + `#c:wither_bones`) | **not ported** — needs the deferred relic-apple/wither-bone items |
 | Heart amulet, soul amulet, their GUI and Curios slots | **not ported** — Curios + GUI (gap 5); the carried inventory stands in for the slots |
 | Heart patches, Heartpulse belts, Vitality Blade, Vigor Bow | **not ported** — deferred (gap 5) |
 | Wither-bone / echo-shard extra drops (`DropHandler.java:37-47`) | **not ported** — separate items, out of this slice |
@@ -1235,4 +1244,181 @@ here and the package is complete; the registry's `fetch.sh` step stays red until
 maintainer's staging step and cannot be done from the port.
 
 Skills: superpowers/using-superpowers,writing-plans,systematic-debugging,test-driven-development,verification-before-completion; BeautifulRust/rust-best-practices,rust-port
+
+## Slice 4 (0.2.3) — the melted-heart chain, crafted and smelted in game (2026-11-22)
+
+The gap this closes, quoted from the coverage table as it read before this slice (and from
+`## Deviations and gaps` gap 5):
+
+> | Miniature-heart recipes (melted-heart chain: `red_heart.json` = 8 `bhc:red_heart_melted` + `#c:hearts`) | **not ported** — the melted items/relic apple/wither bones are deferred (gap 5); a heart in a table crafts nothing, asserted |
+
+It is the highest-value remaining family that still fits the ledger's **logic** tier: four plain
+items, vanilla recipe types, and no block entity, menu, renderer or new hook. The heart that a
+player can already eat is the mod's main consumable, and until this slice it could only be found
+as a drop — now it can be made, which is what the jar's own progression is built on.
+
+### What the artefact ships (and where it differs from the brief)
+
+From the pack's own jar, `ports/_shared/licence-cache/baubley-heart-canisters-1.21.1-1.5.0.jar`
+(the version the pack installs; the 1.4.3 analysis in `../_shared/upstream/bhc/FINDINGS.md` names
+the same chain):
+
+| Family | Jar files | Carried as |
+|---|---|---|
+| Four melted hearts | `assets/bhc/models/item/{red,yellow,green,blue}_heart_melted.json`, `textures/item/*_heart_melted.png`, lang keys `item.bhc.*_heart_melted` | `data/bhc/horizon/item/*_heart_melted.json` (stick template), `assets/bhc/items/*`, `assets/bhc/models/item/*`, the jar's 16×16 textures byte for byte, four lang keys, and the creative tab |
+| Four smelting recipes | `data/bhc/recipe/*_heart_melted_from_smelting.json` | `data/bhc/recipe/*_heart_melted_from_smelting.json` |
+| Six tier conversions | `*_heart_melted_from_<other>_heart_melted.json` | all six |
+| Four heart recipes | `data/bhc/recipe/{red,yellow,green,blue}_heart.json` | all four, `###`/`#H#`/`###` with `H` = `#c:hearts` |
+| The tag the heart recipes read | `data/c/tags/item/hearts.json` (the four hearts) | `data/c/tags/item/hearts.json` |
+
+**Two counts in the brief are lower than the artefact, and the artefact wins:**
+
+- **Cooking times are 100/200/300/400 ticks, not 100.** Red is 100 (the brief's assertion);
+  yellow is 200, green 300, blue 400, with experience 0.1/0.3/0.7/1.0. All four are carried at the
+  jar's values and each is asserted in game at its own time.
+- **There are six tier-conversion recipes, not three**: 9 lower melted → 1 higher (shaped 3×3) and
+  1 higher → 9 lower (shapeless), for red↔yellow, yellow↔green and green↔blue. Carrying only three
+  would have invented a one-way chain the mod does not have; all six are carried and proved.
+
+**The jar's ingredient objects cannot be loaded as written.** Every jar recipe writes
+`"ingredient": {"item": "bhc:red_heart"}` / `"key": {"#": {"item": …}, "H": {"tag": "c:hearts"}}`.
+Horizon's loader reads the *string* form: `Ingredient::parse`
+(`crates/horizon-client/src/crafting.rs:54-77`) treats a `String` as an id or `#tag`, an array as
+strings only, and an object via `parse_object`, which requires a NeoForge `type` and returns `None`
+for a bare `{"item": …}` — so an object-form ingredient resolves to no item and the recipe is
+dropped (`crafting_shaped`: `ok = false`, the file is skipped; smelting: `ing` is `None`, the
+recipe is not pushed). The carried files therefore use the same meaning in the loader's spelling:
+`"ingredient": "bhc:red_heart"`, `"#": "bhc:red_heart_melted"`, `"H": "#c:hearts"`. That is also
+valid vanilla recipe JSON (the existing `canister.json` already used it). No alternative-list
+ingredient is used anywhere.
+
+**No Rust rule changed, and none was needed.** Smelting is a vanilla recipe type the engine serves
+from data (`Recipes::cook`, `crafting.rs:1820-1835`, keyed by the ingredient's resolved items), and
+the crafting recipes go through the same `Recipes::find` the empty `canister` recipe already used.
+`src/runtime.rs` is byte-identical (`a854a78601f5…`, the 0.2.2 file) and `src/lib.rs` is untouched:
+45 tests, the same four glue tests. `uses.json` is a scan of `src/`, so it is the table 0.2.2 had,
+and the brief's "one furnace callback" is the *harness* leg that drives a furnace — there is no
+mod-side callback to write, which is why the package's `uses.json` gained nothing.
+
+### Red first: the new family is absent from the 0.2.2 package
+
+The new legs were written before the content and run against the **0.2.2 export** still on disk
+(`~/.cache/horizon-e2e/0a875da/bhc`, built from the previous package). Verbatim, the first
+assertion that names the family
+(`ports/_shared/evidence/bhc-e2e/e2e-0.2.3-red-melted-heart-chain.log`):
+
+```
+== every content item id is giveable, and an unknown id is refused ==
+FAIL: the package did not provide bhc:red_heart_melted
+EXIT:1
+```
+
+The same script on the 0.2.3 package is the green run below, so the leg is the red→green proof.
+
+### Green: the ladder and the game
+
+| Command | Evidence | Result |
+|---|---|---|
+| `cargo test --offline` | `evidence/bhc/sdk-0a875da-0.2.3/sdk-test.log` | **45 passed**, 0 failed (41 runtime + 4 glue; no test changed) |
+| `cargo fmt --check` + `cargo clippy --all-targets -- -D warnings` | `…/sdk-clippy.log` | exit 0, **0 warnings** |
+| `cargo horizon-mod build` ×4 (`rm -f Cargo.lock` before each) | `…/build-{1,2}.log` then `…/build-{3,4}.log` | exit 0; builds 1/2 `cmp`-identical, and 3/4 (after the README/notes wording went in — `README.md` is packed) `cmp`-identical too |
+| two more builds from the final tree | `…/build-repeat.txt` | each **reproduces the delivered SHA-256 `2788a8ae…`** (`cmp` clean against the port-root package) |
+| package | `sha256sum; stat -c%s` | **49,120 B**, SHA-256 `2788a8aed2b919abbbdd33278ed31e4629f40f83265af6376ab60457fa2ff3ae`, **84 entries**, no packed `Cargo.lock` |
+| `cargo horizon-mod check bhc.hmod` | `…/sdk-check-fits.log` | `bhc 0.2.3 (native-mod, format native-1/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/e59da9094f0c2fdda6c627fe9eff22dec6a906f0, for 26.3)`, `49120 bytes, SHA-256 2788a8ae…`, exit 0 |
+| `cargo horizon-mod fits bhc.hmod --build 0a875da` | same log | `0a875da  made for`, exit 0 |
+| `cargo horizon-mod fits bhc.hmod --build 0b14f8a` | same log | `0b14f8a  fits`, exit 0 |
+| `python3 ports/tools/verify-sdk-package.py bhc` | — | **1/1 package(s) verified** (`runtime byte-identical a854a78601f5`, 45 tests) |
+| `ports/tools/launcher-game.sh build bhc` | `evidence/bhc-e2e/launcher-build-0.2.3.log` | `Compiling bhc (1 of 1)` → `native-0a875da-839435ae8060` built and exported (a second build after the packed `README.md` changed; the first was `…-ddd18e748bd9`) |
+| `tools/e2e.sh` (default) | `evidence/bhc-e2e/e2e-0.2.3-default.log` | **`PASS` + `EXIT:0`** |
+| `MODE=control tools/e2e.sh` (the same Nightly, no package) | `…/e2e-0.2.3-control.log` | **`FAIL` + `EXIT:1`** |
+| `SELFTEST=1 tools/e2e.sh` | `…/e2e-0.2.3-selftest.log` | **`FAIL` + `EXIT:1`** |
+| the pre-content run (red) | `…/e2e-0.2.3-red-melted-heart-chain.log` | **`FAIL` + `EXIT:1`** |
+| `python3 ports/tools/check-e2e-logs.py bhc-e2e --strict` | — | `logs=11 ok=11 missing-exit=0 bad-exit=0`, exit 0 |
+| `python3 ports/tools/check-skills.py --notes ports/bhc` | — | `SKILLS GATE: PASS` |
+
+Every cargo ladder and e2e step ran through `ports/tools/build-slot.sh` with `CARGO_INCREMENTAL=0`
+and no `--target-dir`; the launcher build is the documented `ports/tools/launcher-game.sh build bhc`
+(it compiles the mod in the launcher's own tree, then the legs lease a slot). The e2e used the
+launcher's `E2E_TMP` under `~/.cache/horizon-e2e/scratch`, never `/tmp`. The delivered package was copied from `target/horizon-mod/bhc.hmod` to the port root
+after the second `cmp`-identical build; `Cargo.lock` was removed before both builds (the 0.2.2
+trap), so the package is 84 entries and `verify-sdk-package.py`'s "no packed Cargo.lock" check
+passes. `README.md` travels **inside** the package, so the doc wording was finished before the last
+pair of builds; the three e2e legs above ran against that final 49,120 B package
+(`native-0a875da-839435ae8060`), not the earlier 48,723 B one.
+
+#### The furnace leg (asserting the tick count from both sides)
+
+A furnace at `2 64 3` is replaced before each case, primed with one heart in slot 0 and one coal in
+slot 1, and read with `ctl container`. Each recipe is asserted **before and after** its
+`cookingtime`, so a vanilla-default 200 ticks or an instant result fails one half:
+
+```
+== smelting: a red heart becomes a melted heart in 100 ticks, not before ==
+  bhc:red_heart after ~70 of 100 ticks: input 1, output 0
+  bhc:red_heart after ~130 of 100 ticks: input 0, output 1
+  bhc:yellow_heart after ~170 of 200 ticks: input 1, output 0
+  bhc:yellow_heart after ~230 of 200 ticks: input 0, output 1
+  bhc:green_heart after ~270 of 300 ticks: input 1, output 0
+  bhc:green_heart after ~330 of 300 ticks: input 0, output 1
+  bhc:blue_heart after ~370 of 400 ticks: input 1, output 0
+  bhc:blue_heart after ~430 of 400 ticks: input 0, output 1
+== smelting: a stick has no smelting recipe and makes nothing ==
+  stick after 140 ticks: input 1, output []
+```
+
+The stick is the live negative: the furnace is lit and ticking, so an output assertion that did not
+read the recipe would see a product.
+
+#### The table leg (`tools/craft_check.py`)
+
+Fourteen recipes, each asserted on the result's id and count **and** on the grid being consumed;
+two negatives (7 melted + 1 heart, and 8 iron + a heart). The heart recipes each put a *different*
+colour in the centre, which is what proves the `c:hearts` tag matched rather than the result's own
+id:
+
+```
+red_heart.json: 8 bhc:red_heart_melted + 1 bhc:blue_heart (#c:hearts) -> {"count": 1, "item": "bhc:red_heart", "slot": 200}
+yellow_heart.json: 8 bhc:yellow_heart_melted + 1 bhc:red_heart (#c:hearts) -> {"count": 1, "item": "bhc:yellow_heart", "slot": 200}
+green_heart.json: 8 bhc:green_heart_melted + 1 bhc:blue_heart (#c:hearts) -> {"count": 1, "item": "bhc:green_heart", "slot": 200}
+blue_heart.json: 8 bhc:blue_heart_melted + 1 bhc:yellow_heart (#c:hearts) -> {"count": 1, "item": "bhc:blue_heart", "slot": 200}
+7 melted hearts + 1 heart (the recipe needs all eight) -> null
+  inventory after taking it -> {"bhc:yellow_heart_melted": 1}     (9 red melted → 1 yellow)
+  inventory after taking it -> {"bhc:red_heart_melted": 9}        (1 yellow melted → 9 red)
+  inventory after taking it -> {"bhc:green_heart_melted": 1}      (9 yellow melted → 1 green)
+  inventory after taking it -> {"bhc:yellow_heart_melted": 9}     (1 green melted → 9 yellow)
+  inventory after taking it -> {"bhc:blue_heart_melted": 1}       (9 green melted → 1 blue)
+  inventory after taking it -> {"bhc:green_heart_melted": 9}      (1 blue melted → 9 green)
+recipe PASS: … all four heart recipes … all six tier recipes … every case consuming its grid
+```
+
+The full log also shows the pre-existing canister case, the wrong-pattern negative, and the 8-iron
+negative (`8 iron around a miniature heart (the recipe needs melted hearts) -> null`), all
+unchanged.
+
+Tally: the package now carries **15** recipe files — this slice's 14 (4 smelting + 6 tier
+conversions + 4 heart recipes) plus slice 1's empty `canister` recipe — and the e2e crafts or smelts
+every one of them.
+
+### Documented behaviour, not a defectThe heart recipe's centre is the `c:hearts` tag, so `red_heart.json` can turn a red heart into a
+red heart (8 melted + the red heart itself). That is upstream's shipped data — the tag has exactly
+the four hearts — and it is a conversion (a tier's melted hearts plus one heart of any tier make
+one heart of that tier), not a lossless recipe. No change is made; the e2e proves the tag by using
+a different colour and does not assert the same-colour case.
+
+### Coverage rows this slice changes
+
+| Jar family | Was | Now |
+|---|---|---|
+| Four `*_heart_melted` items (models, 16×16 textures, lang, creative tab) | not ported | **tested** — every id giveable and read back in the item leg (fourteen ids now) |
+| Four `*_heart_melted_from_smelting` recipes (100/200/300/400 ticks) | not ported | **tested** — `smelt_leg`: output id/count after the cook time, none before it, input consumed; a stick makes nothing |
+| Six tier-conversion recipes | not ported | **tested** — `craft_check.py`, both directions, grid consumed |
+| Four heart recipes (8 melted + `#c:hearts`) | not ported | **tested** — `craft_check.py`, each with a different colour in the centre; 7 melted → nothing |
+| `data/c/tags/item/hearts.json` | not ported | **tested** — the four heart recipes match a heart of another colour, which is the tag |
+
+Still `not ported`, unchanged: the coloured canister recipes (they need the relic apple and wither
+bones), the amulet and Curios, patches/belts/weapons, the starting-health tweak. The dragon group
+stays `blocked` for the reason in `## Slice 2 in game at 0b14f8a` (the engine never dispatches the
+drop hook for the dragon's death).
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
 

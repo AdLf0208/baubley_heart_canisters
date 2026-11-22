@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "bhc:yellow_heart",
+  "key": {
+    "#": "bhc:yellow_heart_melted",
+    "H": "#c:hearts"
+  },
+  "pattern": [
+    "###",
+    "#H#",
+    "###"
+  ],
+  "result": {
+    "count": 1,
+    "id": "bhc:yellow_heart"
+  }
+}

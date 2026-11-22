@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:smelting",
+  "category": "misc",
+  "cookingtime": 300,
+  "experience": 0.7,
+  "group": "bhc:green_heart_melted",
+  "ingredient": "bhc:green_heart",
+  "result": {
+    "count": 1,
+    "id": "bhc:green_heart_melted"
+  }
+}

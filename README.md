@@ -1,4 +1,4 @@
-# Baubley Heart Canisters — Horizon port (SDK format, 0.2.2)
+# Baubley Heart Canisters — Horizon port (SDK format, 0.2.3)
 
 A clean-room Rust rewrite of
 [Baubley Heart Canisters 1.21.1-1.4.3](https://github.com/Traverse-Joe/Baubley-Heart-Canisters)
@@ -21,6 +21,12 @@ cleared the loot table; and they are
 unless the player is creative, and never granting permanent max health. `heart_eating` and the
 four `*_heart_heal` keys tune it.
 
+The melted-heart chain is carried too: smelting a miniature heart gives its melted heart (100/200/
+300/400 ticks by tier, with the jar's experience), nine melted hearts of one tier craft one of the
+next tier up and one higher crafts nine lower, and eight of a tier's melted hearts plus any heart
+(`#c:hearts`) craft that tier's miniature heart again — so a heart can be remade instead of only
+found. All fourteen recipes are crafted or smelted in a real game by the e2e.
+
 Upstream stores canisters in a Curios Heart Amulet; this slice defers Curios, the amulet and the
 GUI, so the main inventory (plus off-hand) stands in for the amulet's slots. See
 [notes.md](notes.md) for the upstream behaviour with `file:line`, the pin answers, gaps, the
@@ -41,9 +47,10 @@ src/lib.rs             the one impl mod_api::Hooks: config, per-player tick, hea
 src/runtime.rs         the pure health/drop/heart/config core + its 41 tests (the retired
                        bundle's rules; the type was renamed and two comments added, see notes.md)
 assets/bhc/            item definitions, models, textures, lang
-data/bhc/              item templates, creative tab, canister recipe
-data/c/tags/           the two common tags the recipe names
+data/bhc/              item templates, creative tab, the canister recipe and the melted-heart chain
+data/c/tags/           the common tags the recipes name (`bones`, `ingots/iron`, `hearts`)
 tools/e2e.sh           in-game scenario (needs a launcher-built game; default + MODE=control)
+tools/craft_check.py   every carried table recipe, in a real crafting table
 notes.md               behaviour, design, gaps, migration, verification
 ```
 
@@ -74,8 +81,11 @@ before the build: a lock written by `cargo test` would be packed and change the 
 
 The in-game scenario is `tools/e2e.sh`, run with `GAME=<launcher-built horizon-client>`: the
 default leg proves the canister health table (20→22→24→26→24→40→20), that 24 survives a respawn
-and a relaunch, the mob-drop differential (a zombie drops the configured hearts, a cow none) and
-the eat table (a red heart heals exactly 20 and is consumed, a stick heals nothing, creative
-keeps its heart, a full-health survival use still consumes one, max health never rises from
-eating). `MODE=control` sets `heart_stack_size = 0`, `mob_drops = false` and `heart_eating =
-false` and proves the same actions change nothing.
+and a relaunch, the mob-drop differential (a zombie drops the configured hearts, a cow none), the
+furnace (a red heart becomes a melted heart at 100 ticks and not before, the other tiers at
+200/300/400, a stick never smelts), every table recipe in `tools/craft_check.py` (the canister, the
+four heart recipes with a different colour in the centre, the six tier conversions, and the
+negatives), and the eat table (a red heart heals exactly 20 and is consumed, a stick heals
+nothing, creative keeps its heart, a full-health survival use still consumes one, max health never
+rises from eating). `MODE=control` runs the same item and drop assertions on the unmodified game
+of the same build and must fail; `SELFTEST=1` inverts the drop assertion and must fail too.
